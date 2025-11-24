@@ -13,11 +13,11 @@ def init_index():
     global index, dims
 
     # Ask storage node for vector shape
-    info = requests.get("http://localhost:8001/get_vectors").json()
+    info = requests.get("http://localhost:8000/get_vectors").json()
     count, dims = info["count"], info["dims"]
 
     # Fetch all vectors
-    response = requests.post("http://localhost:8001/fetch_partition", json={"start": 0, "end": count})
+    response = requests.post("http://localhost:8000/fetch_partition", json={"start": 0, "end": count})
     vectors = np.array(response.json(), dtype="float32")
 
     # Build FAISS index
