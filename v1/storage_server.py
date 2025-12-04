@@ -1,98 +1,65 @@
-# NOTE: Run with uvicorn storage_server:app --host 0.0.0.0 --port 8000 --reload
-
+# storage_server.py
 import os
-from fastapi import FastAPI
+import hashlib
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import numpy as np
+from typing import Dict, List
 
-app = FastAPI()
+# Which shard this server owns: 0 or 1
+SHARD_ID = int(os.environ.get("SHARD_ID", "0"))
+NUM_SHARDS = 2
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "vectors.npy")
+# In-memory store (dictionary)
+DB: Dict[str, List[float]] = {}
 
-vectors = None
-
-class PartitionRequest(BaseModel):
-    start: int
-    end: int
-
-class InsertRequest(BaseModel):
-    vector: list[float]
-
-class PartitionBatch(BaseModel):
-    ranges: list[PartitionRequest]
-
-def _load_vectors_from_disk():
-    global vectors
-    if vectors is not None:
-        return
-    if os.path.exists(DATA_PATH):
-        vectors = np.load(DATA_PATH)
+app = FastAPI(title=f"Storage Server Shard {SHARD_ID}")
 
 
-def _persist():
-    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
-    np.save(DATA_PATH, vectors)
+def compute_shard(vector_id: str) -> int:
+    """Hash-based sharding: always compute the SAME shard."""
+    h = hashlib.sha256(vector_id.encode()).hexdigest()
+    return int(h, 16) % NUM_SHARDS
 
 
-@app.post("/init_store")
-def init_store(dims: int = 128):
-    """Initialize an empty store on disk with the given dimension."""
-    global vectors
-    vectors = np.empty((0, dims), dtype="float32")
-    _persist()
-    return {"status": "initialized", "count": 0, "dims": dims}
+class VectorPayload(BaseModel):
+    id: str
+    vector: List[float]
 
 
-@app.get("/stats")
-def stats():
-    _load_vectors_from_disk()
-    if vectors is None:
-        return {"count": 0, "dims": None}
-    return {"count": vectors.shape[0], "dims": vectors.shape[1]}
+@app.post("/store")
+def store_vec(payload: VectorPayload):
+    shard = compute_shard(payload.id)
+    if shard != SHARD_ID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ID {payload.id} belongs to shard {shard}, not shard {SHARD_ID}"
+        )
+
+    DB[payload.id] = payload.vector
+    return {"status": "stored", "id": payload.id, "shard": SHARD_ID}
 
 
-@app.post("/insert_vector")
-def insert_vector(body: InsertRequest):
-    global vectors
-    _load_vectors_from_disk()
+@app.get("/get/{vector_id}")
+def get_vec(vector_id: str):
+    shard = compute_shard(vector_id)
+    if shard != SHARD_ID:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ID {vector_id} belongs to shard {shard}, not this shard"
+        )
 
-    vec = np.array(body.vector, dtype="float32")
+    if vector_id not in DB:
+        raise HTTPException(404, "Vector not found")
 
-    if vectors is None:
-        # Initialize based on first vector
-        vectors = np.empty((0, vec.shape[0]), dtype="float32")
-
-    if vec.shape != (vectors.shape[1],):
-        return {"error": f"dimension mismatch: expected {vectors.shape[1]}"}
-
-    vectors = np.vstack([vectors, vec])
-    _persist()
-
-    return {"status": "inserted", "count": vectors.shape[0], "dims": vectors.shape[1]}
+    return {"id": vector_id, "vector": DB[vector_id], "shard": SHARD_ID}
 
 
-@app.post("/fetch_partition")
-def fetch_partition(range: PartitionRequest):
-    _load_vectors_from_disk()
-    if vectors is None:
-        return {"error": "no vectors found"}
-
-    start, end = range.start, range.end
-
-    if start < 0 or end < 0 or start > end or end > vectors.shape[0]:
-        return {"error": "invalid range", "count": vectors.shape[0]}
-
-    return vectors[start:end].tolist()
+@app.get("/list_ids")
+def all_ids():
+    return {"count": len(DB), "ids": list(DB.keys()), "shard": SHARD_ID}
 
 
-@app.post("/fetch_partitions")
-def fetch_partitions(body: PartitionBatch):
-    _load_vectors_from_disk()
-    if vectors is None:
-        return {"error": "no vectors found"}
-    parts = []
-    for r in body.ranges:
-        if r.start < 0 or r.end < 0 or r.start > r.end or r.end > vectors.shape[0]:
-            return {"error": "invalid range", "count": vectors.shape[0], "range": r.dict()}
-        parts.append(vectors[r.start:r.end].tolist())
-    return {"partitions": parts, "count": vectors.shape[0]}
+# Lets the test code know that the server is up and running
+@app.get("/")
+def root():
+    return {"status": "ok", "shard": SHARD_ID}
