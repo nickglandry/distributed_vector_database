@@ -43,4 +43,5 @@ if __name__ == "__main__":
     print("storage:", ensure_store())
     print("init_index:", init_index())
     print("insert:", insert_sentence("hello world"))
+    print("insert:", insert_sentence("Welcome to New York"))
     print("query:", query_sentence("hello world"))

@@ -1,3 +1,5 @@
+# NOTE: Run with uvicorn storage_server:app --host 0.0.0.0 --port 8000 --reload
+
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -9,15 +11,15 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "vectors.npy")
 
 vectors = None
 
-
 class PartitionRequest(BaseModel):
     start: int
     end: int
 
-
 class InsertRequest(BaseModel):
     vector: list[float]
 
+class PartitionBatch(BaseModel):
+    ranges: list[PartitionRequest]
 
 def _load_vectors_from_disk():
     global vectors
@@ -81,3 +83,16 @@ def fetch_partition(range: PartitionRequest):
         return {"error": "invalid range", "count": vectors.shape[0]}
 
     return vectors[start:end].tolist()
+
+
+@app.post("/fetch_partitions")
+def fetch_partitions(body: PartitionBatch):
+    _load_vectors_from_disk()
+    if vectors is None:
+        return {"error": "no vectors found"}
+    parts = []
+    for r in body.ranges:
+        if r.start < 0 or r.end < 0 or r.start > r.end or r.end > vectors.shape[0]:
+            return {"error": "invalid range", "count": vectors.shape[0], "range": r.dict()}
+        parts.append(vectors[r.start:r.end].tolist())
+    return {"partitions": parts, "count": vectors.shape[0]}

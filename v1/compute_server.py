@@ -1,10 +1,12 @@
+# NOTE: Run with uvicorn compute_server:app --host 0.0.0.0 --port 8001 --reload
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 import numpy as np
 import requests
 import faiss
 
-from . import embed
+import embed
 
 app = FastAPI()
 
@@ -21,45 +23,49 @@ class QueryTextRequest(BaseModel):
     text: str
     k: int = 5
 
+
+# v1/compute_server.py
+CHUNK_SIZE = 10_000  # tune based on payload size/memory
+
 @app.post("/init_index")
 def init_index():
     global index, dims
 
-    # Ask storage node for vector shape
     try:
-        resp = requests.get(f"{STORAGE_URL}/stats")
-        resp.raise_for_status()
-        info = resp.json()
-    except Exception as exc:  # broad so we surface connection or HTTP errors cleanly
+        stats = requests.get(f"{STORAGE_URL}/stats").json()
+    except Exception as exc:
         return {"error": "failed to contact storage node", "details": str(exc)}
 
-    if "error" in info:
-        return info
-
-    count, dims = info["count"], info["dims"]
-
+    if "error" in stats:
+        return stats
+    count, dims = stats["count"], stats["dims"]
     if dims is None:
         return {"error": "no vectors found and store not initialized"}
 
-    # Fetch all vectors
-    try:
-        response = requests.post(f"{STORAGE_URL}/fetch_partition", json={"start": 0, "end": count})
-        response.raise_for_status()
-        payload = response.json()
-    except Exception as exc:
-        return {"error": "failed to fetch vectors from storage", "details": str(exc)}
-
-    if isinstance(payload, dict) and "error" in payload:
-        return payload
-
-    vectors = np.array(payload, dtype="float32")
-
-    # Build FAISS index
     index = faiss.IndexFlatL2(dims)
-    if count > 0:
-        index.add(vectors)
 
-    return {"status": "index built", "vector_count": count}
+    # Pull partitions sequentially to avoid huge responses
+    added = 0
+    for start in range(0, count, CHUNK_SIZE):
+        end = min(start + CHUNK_SIZE, count)
+        try:
+            resp = requests.post(
+                f"{STORAGE_URL}/fetch_partition", json={"start": start, "end": end}
+            )
+            resp.raise_for_status()
+            block = resp.json()
+        except Exception as exc:
+            return {"error": "failed to fetch vectors from storage", "details": str(exc), "range": [start, end]}
+
+        if isinstance(block, dict) and "error" in block:
+            return block
+
+        if block:
+            vecs = np.array(block, dtype="float32")
+            index.add(vecs)
+            added += vecs.shape[0]
+
+    return {"status": "index built", "vector_count": added, "dims": dims, "chunk_size": CHUNK_SIZE}
 
 
 def _ensure_index(target_dims: int):
