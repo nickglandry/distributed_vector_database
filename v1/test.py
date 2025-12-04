@@ -80,19 +80,6 @@ def test_list_shards():
             print(f"Shard {i} error:", e)
     print()
 
-
-def test_get_vectors():
-    print("=== TEST: GET vectors individually ===")
-
-    for vid in ["vecA", "vecB", "vecC", "vecD"]:
-        shard = compute_shard(vid)
-        url = STORAGE_NODES[shard]
-        print(f"GET {vid} (should be on shard {shard})")
-        r = requests.get(f"{url}/get/{vid}")
-        print(pretty(r.json()))
-    print()
-
-
 def test_search():
     print("=== TEST: SEARCH via compute server ===")
 
@@ -115,7 +102,6 @@ def main():
     wait_for_servers()
     test_store_vectors()
     test_list_shards()
-    test_get_vectors()
     test_search()
     print("=== Tests completed ===")
 
