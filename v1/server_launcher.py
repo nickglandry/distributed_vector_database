@@ -65,13 +65,11 @@ def cleanup():
 def main():
     print("=== Starting Simple 2-Shard Vector DB ===\n")
 
-    # Start shard 0
-    start_storage_server(shard_id=0, port=8001)
-    time.sleep(0.3)
-
-    # Start shard 1
-    start_storage_server(shard_id=1, port=8002)
-    time.sleep(0.3)
+    for i in range(0, 8):
+        port = f'800{i+1}'
+        port = int(port)
+        start_storage_server(shard_id=i, port=port)
+        time.sleep(0.3)
 
     # Start compute server
     start_compute_server(port=9000)

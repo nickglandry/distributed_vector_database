@@ -1,40 +1,27 @@
 # storage_server.py
 import os
 import json
-import hashlib
+import sqlite3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List
 
 SHARD_ID = int(os.environ.get("SHARD_ID", "0"))
-NUM_SHARDS = 2
+DB_FILE = f"data/shard_{SHARD_ID}.sqlite3"
 
-# File for this shard
-SHARD_FILE = f"data/shard_{SHARD_ID}.json"
+# Ensure SQLite file exists and has the right schema
+conn = sqlite3.connect(DB_FILE)
+cur = conn.cursor()
+cur.execute("""
+CREATE TABLE IF NOT EXISTS vectors (
+    id TEXT PRIMARY KEY,
+    vector_json TEXT NOT NULL
+)
+""")
+conn.commit()
+conn.close()
 
-# Ensure file exists
-if not os.path.exists(SHARD_FILE):
-    with open(SHARD_FILE, "w") as f:
-        json.dump({}, f)
-
-app = FastAPI(title=f"Storage Server Shard {SHARD_ID}")
-
-
-def compute_shard(vector_id: str) -> int:
-    h = hashlib.sha256(vector_id.encode()).hexdigest()
-    return int(h, 16) % NUM_SHARDS
-
-
-def read_shard() -> Dict[str, List[float]]:
-    """Always read the shard file from disk."""
-    with open(SHARD_FILE, "r") as f:
-        return json.load(f)
-
-
-def write_shard(data: Dict[str, List[float]]):
-    """Always write data back to the shard file."""
-    with open(SHARD_FILE, "w") as f:
-        json.dump(data, f)
+app = FastAPI(title=f"Shard {SHARD_ID} Storage Server")
 
 
 class VectorPayload(BaseModel):
@@ -49,37 +36,46 @@ def root():
 
 @app.post("/store")
 def store_vec(payload: VectorPayload):
-    shard = compute_shard(payload.id)
-    if shard != SHARD_ID:
-        raise HTTPException(
-            status_code=400,
-            detail=f"ID {payload.id} belongs to shard {shard}, not shard {SHARD_ID}",
-        )
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
 
-    db = read_shard()
-    db[payload.id] = payload.vector
-    write_shard(db)
+    # Store vector as JSON on disk
+    cur.execute(
+        "REPLACE INTO vectors (id, vector_json) VALUES (?, ?)",
+        (payload.id, json.dumps(payload.vector))
+    )
 
+    conn.commit()
+    conn.close()
     return {"status": "stored", "id": payload.id, "shard": SHARD_ID}
 
 
 @app.get("/get/{vector_id}")
 def get_vec(vector_id: str):
-    shard = compute_shard(vector_id)
-    if shard != SHARD_ID:
-        raise HTTPException(
-            status_code=400,
-            detail=f"ID {vector_id} belongs to shard {shard}, not this shard",
-        )
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
 
-    db = read_shard()
-    if vector_id not in db:
-        raise HTTPException(404, "Vector not found")
+    cur.execute("SELECT vector_json FROM vectors WHERE id = ?", (vector_id,))
+    row = cur.fetchone()
+    conn.close()
 
-    return {"id": vector_id, "vector": db[vector_id], "shard": SHARD_ID}
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vector not found on this shard")
+
+    return {
+        "id": vector_id,
+        "vector": json.loads(row[0]),
+        "shard": SHARD_ID
+    }
 
 
 @app.get("/list_ids")
 def list_ids():
-    db = read_shard()
-    return {"count": len(db), "ids": list(db.keys()), "shard": SHARD_ID}
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM vectors")
+    ids = [row[0] for row in cur.fetchall()]
+
+    conn.close()
+    return {"count": len(ids), "ids": ids, "shard": SHARD_ID}
