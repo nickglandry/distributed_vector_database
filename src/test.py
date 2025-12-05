@@ -4,16 +4,35 @@ import requests
 import hashlib
 import json
 import numpy as np
+import os
+from embed import embed_text
+from datasets import load_dataset
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ==============================
-# Config
+# Setup
 # ==============================
-
-STORAGE_0 = "http://localhost:8001"
-STORAGE_1 = "http://localhost:8002"
+EMBED_DIM = int(os.getenv('EMBED_DIM'))
+NUM_SHARDS = int(os.getenv('NUM_SHARDS'))
 COMPUTE   = "http://localhost:9000"
+STORAGE_NODES = [
+    f"http://localhost:800{int(node+1)}"
+    for node in range(0, NUM_SHARDS)
+]
 
-STORAGE_NODES = [STORAGE_0, STORAGE_1]
+def load_data():
+    ds = load_dataset("ag_news", split="train[:500]")
+
+    vectors = []
+    for item in ds:
+        vectors.append({
+            "id": item["text"],
+            "vector": embed_text(item["text"])
+        })
+
+    return vectors
 
 
 # ==============================
@@ -22,12 +41,6 @@ STORAGE_NODES = [STORAGE_0, STORAGE_1]
 
 def pretty(x):
     return json.dumps(x, indent=4)
-
-
-def compute_shard(id_str):
-    """Must match storage_server + compute_server logic."""
-    h = hashlib.sha256(id_str.encode()).hexdigest()
-    return int(h, 16) % 2
 
 
 def wait_for_servers():
@@ -54,19 +67,17 @@ def wait_for_servers():
 def test_store_vectors():
     print("=== TEST: STORE vectors via compute_server ===")
 
-    sample_vectors = [
-        {"id": "vecA", "vector": [0.1, 0.2, 0.3]},
-        {"id": "vecB", "vector": [0.0, 0.5, 0.9]},
-        {"id": "vecC", "vector": [0.9, 0.1, 0.2]},
-        {"id": "vecD", "vector": [0.2, 0.8, 0.4]},
-    ]
+    # str1 = "The quick brown fox jumped over the lazy dog."
+    # str2 = "The Eiffel Tower is in Paris."
+    # str3 = "Artificial intelligence is transforming the way people work and learn."
+    # str4 = "Data scientists often rely on vector embeddings to capture semantic meaning from text."
 
-    for v in sample_vectors:
-        shard = compute_shard(v["id"])
-        print(f"Storing {v['id']} → shard {shard}")
-        resp = requests.post(f"{COMPUTE}/store", json=v)
-        print("Response:", pretty(resp.json()))
-    print()
+    vectors = load_data()
+
+    for v in vectors:
+        requests.post(f"{COMPUTE}/store", json=v)
+    
+    print(f"Successfully loaded in {len(vectors)} vectors \n")
 
 
 def test_list_shards():
@@ -75,7 +86,7 @@ def test_list_shards():
     for i, url in enumerate(STORAGE_NODES):
         try:
             r = requests.get(f"{url}/list_ids")
-            print(f"Shard {i}:", pretty(r.json()))
+            print(f"Shard {i} loaded successfully")
         except Exception as e:
             print(f"Shard {i} error:", e)
     print()
@@ -83,10 +94,10 @@ def test_list_shards():
 def test_search():
     print("=== TEST: SEARCH via compute server ===")
 
-    query_vec = [0.0, 0.2, 1.0]
+    query_str  = "Buildings in France."
     r = requests.post(
         f"{COMPUTE}/search",
-        json={"query_vector": query_vec, "top_k": 3}
+        json={"query_vector": embed_text(query_str), "top_k": 3}
     )
 
     print("Search results:")
