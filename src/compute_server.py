@@ -19,7 +19,7 @@ STORAGE_NODES: Dict[int, str] = {
 }
 
 # Centroids must match the dimensionality of your vectors
-# TODO: Use K-Means clustering on sample data to generate centriods once large sample generated
+# NOTE: Centroids are randomly assigned by default UNLESS user specifies them
 CENTROIDS: Dict[int, List[float]] = {
     shard: np.random.randn(EMBED_DIM).tolist()
     for shard in range(NUM_SHARDS)
@@ -61,6 +61,14 @@ class SearchRequest(BaseModel):
     query_vector: List[float]
     top_k: int = 5
     shards_to_search: int = 1
+
+
+# User can specify centroids
+@app.post("/set_centroids")
+def set_centroids(centroids: Dict[int, List[float]]):
+    global CENTROIDS
+    CENTROIDS = centroids
+    return {"status": "centroids updated", "count": len(centroids)}
 
 
 @app.get("/")

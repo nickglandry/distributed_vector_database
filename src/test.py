@@ -8,6 +8,7 @@ import os
 from embed import embed_text
 from datasets import load_dataset
 from dotenv import load_dotenv
+from cluster import compute_centroids
 
 load_dotenv()
 
@@ -33,6 +34,18 @@ def load_data():
         })
 
     return vectors
+
+
+def find_centroids(vectors):
+    np.random.shuffle(vectors)
+    sample_vectors = vectors[: int(len(vectors) / 10)] # Use random 10% of initial dataset to get sample vectors
+    centroids = compute_centroids(sample_vectors, NUM_SHARDS)
+    centroid_map = {i: c for i, c in enumerate(centroids)}
+    r = requests.post(f"{COMPUTE}/set_centroids", json=centroid_map)
+    if not r.ok:
+        print(f"Error setting centroids: {r.status_code}")
+    else:
+        print(f"Centroids set successfully as {centroids}")
 
 
 # ==============================
@@ -74,6 +87,12 @@ def test_store_vectors():
 
     vectors = load_data()
 
+    vector_values = [
+        val["vector"]
+        for val in vectors
+    ]
+    find_centroids(vector_values)
+
     for v in vectors:
         requests.post(f"{COMPUTE}/store", json=v)
     
@@ -94,7 +113,7 @@ def test_list_shards():
 def test_search():
     print("=== TEST: SEARCH via compute server ===")
 
-    query_str  = "Buildings in France."
+    query_str  = "Historical wars in Europe."
     r = requests.post(
         f"{COMPUTE}/search",
         json={"query_vector": embed_text(query_str), "top_k": 3}
