@@ -4,9 +4,13 @@ import os
 import time
 import signal
 import sys
+from dotenv import load_dotenv
 
+load_dotenv()
+
+EMBED_DIM = int(os.getenv('EMBED_DIM'))
+NUM_SHARDS = int(os.getenv('NUM_SHARDS'))
 processes = []
-
 
 def start_storage_server(shard_id, port):
     """Start one storage server with SHARD_ID env variable."""
@@ -65,7 +69,7 @@ def cleanup():
 def main():
     print("=== Starting Simple 2-Shard Vector DB ===\n")
 
-    for i in range(0, 8):
+    for i in range(0, NUM_SHARDS):
         port = f'800{i+1}'
         port = int(port)
         start_storage_server(shard_id=i, port=port)
@@ -75,12 +79,9 @@ def main():
     start_compute_server(port=9000)
 
     print("\n=============================================")
-    print("🚀 Servers are running!")
-    print("Storage shard 0 → http://localhost:8001")
-    print("Storage shard 1 → http://localhost:8002")
-    print("Compute server → http://localhost:9000")
-    print("=============================================")
+    print("🚀 Servers are running!") # clearly vibecoded emoji use
     print("Press CTRL+C to stop everything.\n")
+    print("=============================================")
 
     # Keep main thread alive
     try:

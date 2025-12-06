@@ -1,1 +1,0 @@
-# TODO: Helper functions to embedd text

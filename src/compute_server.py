@@ -2,32 +2,27 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
+from dotenv import load_dotenv
+from urllib.parse import quote
 import numpy as np
 import requests
+import os
 
-NUM_SHARDS = 2
+load_dotenv
+
+EMBED_DIM = int(os.getenv('EMBED_DIM'))
+NUM_SHARDS = int(os.getenv('NUM_SHARDS'))
 
 STORAGE_NODES: Dict[int, str] = {
-    0: "http://localhost:8001",
-    1: "http://localhost:8002",
-    2: "http://localhost:8003",
-    3: "http://localhost:8004",
-    4: "http://localhost:8005",
-    5: "http://localhost:8006",
-    6: "http://localhost:8007",
-    7: "http://localhost:8008",
+    shard: f"http://localhost:800{shard+1}"
+    for shard in range(NUM_SHARDS)
 }
 
 # Centroids must match the dimensionality of your vectors
+# NOTE: Centroids are randomly assigned by default UNLESS user specifies them
 CENTROIDS: Dict[int, List[float]] = {
-    0: [0.0, 0.0, 0.0],
-    1: [0.0, 0.0, 1.0],
-    2: [0.0, 1.0, 0.0],
-    3: [1.0, 0.0, 0.0],
-    4: [0.0, 1.0, 1.0],
-    5: [1.0, 0.0, 1.0],
-    6: [1.0, 1.0, 0.0],
-    7: [1.0, 1.0, 1.0],
+    shard: np.random.randn(EMBED_DIM).tolist()
+    for shard in range(NUM_SHARDS)
 }
 
 
@@ -68,6 +63,14 @@ class SearchRequest(BaseModel):
     shards_to_search: int = 1
 
 
+# User can specify centroids
+@app.post("/set_centroids")
+def set_centroids(centroids: Dict[int, List[float]]):
+    global CENTROIDS
+    CENTROIDS = centroids
+    return {"status": "centroids updated", "count": len(centroids)}
+
+
 @app.get("/")
 def root():
     return {
@@ -92,7 +95,8 @@ def store(payload: VectorPayload):
 def get_vec(vector_id: str):
     # naive: try all shards
     for shard_id, url in STORAGE_NODES.items():
-        r = requests.get(f"{url}/get/{vector_id}")
+        encoded = quote(vector_id, safe = "")
+        r = requests.get(f"{url}/get/{encoded}")
         if r.status_code == 200:
             d = r.json()
             d["found_in"] = shard_id
@@ -115,7 +119,8 @@ def search(req: SearchRequest):
         ids = ids_resp.json().get("ids", [])
 
         for vid in ids:
-            vec_resp = requests.get(f"{url}/get/{vid}")
+            encoded = quote(vid, safe="")
+            vec_resp = requests.get(f"{url}/get/{encoded}")
             if not vec_resp.ok:
                 continue
 
