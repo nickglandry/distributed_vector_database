@@ -24,7 +24,7 @@ STORAGE_NODES = [
 ]
 
 def load_data():
-    ds = load_dataset("ag_news", split="train[:500]")
+    ds = load_dataset("ag_news", split="train+test")
 
     vectors = []
     for item in ds:
@@ -33,6 +33,7 @@ def load_data():
             "vector": embed_text(item["text"])
         })
 
+    print(f'{len(vectors)} inputs successfully vectorized.')
     return vectors
 
 

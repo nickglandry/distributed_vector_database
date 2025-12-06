@@ -79,12 +79,9 @@ def main():
     start_compute_server(port=9000)
 
     print("\n=============================================")
-    print("🚀 Servers are running!")
-    print("Storage shard 0 → http://localhost:8001")
-    print("Storage shard 1 → http://localhost:8002")
-    print("Compute server → http://localhost:9000")
-    print("=============================================")
+    print("🚀 Servers are running!") # clearly vibecoded emoji use
     print("Press CTRL+C to stop everything.\n")
+    print("=============================================")
 
     # Keep main thread alive
     try:
