@@ -24,7 +24,7 @@ STORAGE_NODES = [
 ]
 
 def load_data():
-    ds = load_dataset("ag_news", split="train+test")
+    ds = load_dataset("ag_news", split="train[:10000]")
 
     vectors = []
     for item in ds:
@@ -117,7 +117,7 @@ def test_search():
     query_str  = "Historical wars in Europe."
     r = requests.post(
         f"{COMPUTE}/search",
-        json={"query_vector": embed_text(query_str), "top_k": 3}
+        json={"query_vector": embed_text(query_str), "top_k": 5}
     )
 
     print("Search results:")
@@ -132,10 +132,17 @@ def test_search():
 def main():
     wait_for_servers()
     test_store_vectors()
-    test_list_shards()
-    test_search()
+    # test_list_shards()
+    measured_times = []
+    for i in range(0, 14):
+        start_time = time.time()
+        test_search()
+        end_time = time.time()
+        if i > 2:
+            elapsed_time = end_time - start_time
+            measured_times.append(elapsed_time)
     print("=== Tests completed ===")
-
+    print(measured_times)
 
 if __name__ == "__main__":
     main()

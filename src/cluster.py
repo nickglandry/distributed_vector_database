@@ -15,6 +15,8 @@ def compute_centroids(vectors: Sequence[Sequence[float]], num_clusters: int) -> 
         A list of centroids, each centroid being a list of floats.
     """
 
+    print(f'Running KNN on {len(vectors)} vectors...')
+
     # Convert to numpy array
     X = np.array(vectors, dtype=float)
 
@@ -29,6 +31,8 @@ def compute_centroids(vectors: Sequence[Sequence[float]], num_clusters: int) -> 
         random_state=42
     )
     kmeans.fit(X)
+
+    print(f'KNN completed.')
 
     # Return centroids as plain Python lists
     return kmeans.cluster_centers_.tolist()
