@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import List
 
 SHARD_ID = int(os.environ.get("SHARD_ID", "0"))
-DB_FILE = f"data/shard_{SHARD_ID}.sqlite3"
+DB_FILE = os.path.join("data", f"shard_{SHARD_ID}.sqlite3")
 
 # Ensure SQLite file exists and has the right schema
 conn = sqlite3.connect(DB_FILE)

@@ -8,7 +8,7 @@ import numpy as np
 import requests
 import os
 
-load_dotenv
+load_dotenv()
 
 EMBED_DIM = int(os.getenv('EMBED_DIM'))
 NUM_SHARDS = int(os.getenv('NUM_SHARDS'))

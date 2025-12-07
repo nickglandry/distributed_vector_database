@@ -18,7 +18,8 @@ def start_storage_server(shard_id, port):
     env["SHARD_ID"] = str(shard_id)
 
     cmd = [
-        "uvicorn",
+        sys.executable,       # uses venv python
+        "-m", "uvicorn",      # runs uvicorn module
         "storage_server:app",
         "--host", "0.0.0.0",
         "--port", str(port),
@@ -33,12 +34,14 @@ def start_storage_server(shard_id, port):
 def start_compute_server(port=9000):
     """Start compute server."""
     cmd = [
-        "uvicorn",
+        sys.executable,
+        "-m", "uvicorn",
         "compute_server:app",
         "--host", "0.0.0.0",
         "--port", str(port),
         "--reload"
     ]
+
 
     print(f"Starting compute server on port {port}...")
     p = subprocess.Popen(cmd)
