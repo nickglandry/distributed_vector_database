@@ -114,7 +114,7 @@ def test_list_shards():
 def test_search():
     print("=== TEST: SEARCH via compute server ===")
 
-    query_str  = "Historical wars in Europe."
+    query_str = "Historical wars in Europe."
     r = requests.post(
         f"{COMPUTE}/search",
         json={"query_vector": embed_text(query_str), "top_k": 5}

@@ -4,7 +4,8 @@ from typing import List
 
 # Load model once at import time
 # all-mpnet-base-v2 → 768-dimensional embeddings
-_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2") # 384 dims
+# all-MiniLM-L6-v2 -> 384-dimensional embeddings
+_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2") # 768 dims
 
 
 def embed_text(text: str) -> List[float]:
