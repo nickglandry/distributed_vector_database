@@ -2,6 +2,10 @@
 
 A minimal end-to-end vector database demo: local embedding, sharding, storage, and retrieval over FastAPI. Each shard stores vectors in SQLite; a compute node routes writes/reads/searches across shards using centroids.
 
+## Report
+
+The project report (`report/report.pdf`) is included in this repository. It is recommended that users review this report prior to any use of the code.
+ 
 ## What’s here
 - src/embed.py — sentence-transformers embedder (all-mpnet-base-v2, 768 dims).
 - src/compute_server.py — FastAPI router that assigns shards, forwards storage/get, and runs cosine search across selected shards.
