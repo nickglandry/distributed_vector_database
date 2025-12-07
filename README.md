@@ -16,7 +16,7 @@ The project report (`report/report.pdf`) is included in this repository. It is r
 - report/benchmarks.py — benchmark results and plotting helpers for varying embedding sizes and shard counts.
 
 ## Requirements
-Python 3.10+ recommended. Install dependencies:
+Python 3.10+ recommended. Install dependencies from `src/requirements.txt`
 
 
 ## Configuration
