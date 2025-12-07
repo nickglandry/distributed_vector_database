@@ -19,7 +19,7 @@ EMBED_DIM = int(os.getenv('EMBED_DIM'))
 NUM_SHARDS = int(os.getenv('NUM_SHARDS'))
 COMPUTE   = "http://localhost:9000"
 STORAGE_NODES = [
-    f"http://localhost:800{int(node+1)}"
+    f"http://localhost:{int(8001 + node)}"
     for node in range(0, NUM_SHARDS)
 ]
 
@@ -45,8 +45,8 @@ def find_centroids(vectors):
     r = requests.post(f"{COMPUTE}/set_centroids", json=centroid_map)
     if not r.ok:
         print(f"Error setting centroids: {r.status_code}")
-    else:
-        print(f"Centroids set successfully as {centroids}")
+    # else:
+    #     print(f"Centroids set successfully as {centroids}")
 
 
 # ==============================

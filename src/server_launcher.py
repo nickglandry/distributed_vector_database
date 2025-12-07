@@ -73,8 +73,7 @@ def main():
     print("=== Starting Simple 2-Shard Vector DB ===\n")
 
     for i in range(0, NUM_SHARDS):
-        port = f'800{i+1}'
-        port = int(port)
+        port = int(8001 + i)
         start_storage_server(shard_id=i, port=port)
         time.sleep(0.3)
 
