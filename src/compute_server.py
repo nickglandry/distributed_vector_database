@@ -14,7 +14,7 @@ EMBED_DIM = int(os.getenv('EMBED_DIM'))
 NUM_SHARDS = int(os.getenv('NUM_SHARDS'))
 
 STORAGE_NODES: Dict[int, str] = {
-    shard: f"http://localhost:800{shard+1}"
+    shard: f"http://localhost:{int(8001 + shard)}"
     for shard in range(NUM_SHARDS)
 }
 
